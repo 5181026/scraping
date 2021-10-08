@@ -1,16 +1,21 @@
-import time                            # スリープを使うために必要
-import chromedriver_binary             # パスを通すためのコード
+import time  # スリープを使うために必要
+import chromedriver_binary  # パスを通すためのコード
 import requests
-from selenium import webdriver         # Webブラウザを自動操作する（python -m pip install selenium)
+from excel import Excel
+from selenium import webdriver  # Webブラウザを自動操作する（python -m pip install selenium)
 from bs4 import BeautifulSoup
+from janome.tokenizer import Tokenizer
 
-search_str = "wifi" #検索文字列
+tokenizer = Tokenizer()
+
+search_str = "Wi-Fi"  # 検索文字列
 # TODO 辞書で細かく分けることで分析できる
-# result_dict = {}    #値を保持するための辞書
-title = []
-title2 = []
-
-url = []
+# keyをranking(int)
+# value
+#   title辞書型
+#   url辞書型
+#   keyword辞書keywordの中をさらに単語ごとの辞書にする
+site_dict = {}  # 値を保持するための辞書
 
 # chromeを使用して情報収集(タイトル,URL)
 driver = webdriver.Chrome()
@@ -21,22 +26,33 @@ driver.get('https://www.google.com/')  # Googleを開く
 # chromeで検索した結果からタイトルとURLを取得する
 # TODO 現在は表示のみをするようになっている、ファイルなどに保存する機能に変更する
 def result():
-    # タイトルとリンクはclass="r"に入っている
+    # タイトルとリンクはclass="yuRUbf"に入っている
     class_group = driver.find_elements_by_class_name('yuRUbf')
-    for elem in class_group:
-        title.append(elem.find_element_by_class_name('LC20lb').text)  # タイトル(class="LC20lb")
-        url.append(elem.find_element_by_tag_name('a').get_attribute('href'))  # リンク(aタグのhref属性)
+    for i in range(3):
+        print("ループ")
+        print(i)
+        site_dict[i + 1] = {
+            "title": class_group[i].find_element_by_class_name('LC20lb').text,  # タイトル(class="LC20lb")
+            "url": class_group[i].find_element_by_tag_name("a").get_attribute("href")  # リンク(aタグのhref属性)
+        }
 
-        # とりあえず３番目まで検索
-        if elem == class_group[2]:
-            break
 
-
+# TODO h1がないサイトが存在すアプリが落ちる
 def scraping():
-    for u in url:
-        response = requests.get(u)
+    for u in site_dict.keys():
+        response = requests.get(site_dict[u]["url"])
         soup = BeautifulSoup(response.text, 'html.parser')
-        title2.append(soup.find('title').get_text())
+        # str_conut_dict.update(string_count(soup.text))
+        site_dict[u]["keyword"] = (string_count(soup.text)) #キーワードは辞書で保持することで複数の文字を保持できるようにする
+        site_dict[u]["h1"] = soup.find('h1').get_text()
+
+
+# 関数としては機能しているが完全一致した文字列のみを取得する。
+# 例：wifi,Wi-Fi
+# 上記のだとサイトごとに個数が違う
+# TODO 現在はサイトごとにとれないようになっている,サイトごとにとれるようにする
+def string_count(html_text):
+    return {search_str: html_text.count(search_str)}
 
 
 search = driver.find_element_by_name('q')  # HTML内で検索ボックス(name='q')を指定する
@@ -46,11 +62,14 @@ time.sleep(3)
 
 result()
 scraping()
-
 driver.quit()                               # ブラウザを閉じる
 
-print(title)
-print(title2)
+excel = Excel()
+excel.create_xlsx_file()
+excel.xlsx_writer(search_str , site_dict)
+
+print("辞書")
+print(site_dict)
 
 
 
